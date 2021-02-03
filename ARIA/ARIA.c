@@ -5,6 +5,9 @@
 */
 #include "aria.h"
 
+byte key[32] = { 0x00 ,0x01 ,0x02 ,0x03 ,0x04 ,0x05 ,0x06 ,0x07 ,0x08 ,0x09 ,0x0a ,0x0b ,0x0c ,0x0d ,0x0e ,0x0f ,0x10 ,0x11 ,0x12 ,0x13 ,0x14 ,0x15 ,0x16 ,0x17 ,0x18 ,0x19 ,0x1a ,0x1b ,0x1c ,0x1d ,0x1e ,0x1f };
+byte p[16] = {0x00 ,0x01 ,0x02 ,0x03 ,0x04 ,0x05 ,0x06 ,0x07 ,0x08 ,0x09 ,0x0a ,0x0b ,0x0c ,0x0d ,0x0e ,0x0f };
+byte* w[Nb * (Nr + 1)] = { 0x00 };
 
 byte s_box1[256] = { 0x63 ,0x7c ,0x77 ,0x7b ,0xf2 ,0x6b ,0x6f ,0xc5 ,0x30 ,0x01 ,0x67 ,0x2b ,0xfe ,0xd7 ,0xab ,0x76
  ,0xca ,0x82 ,0xc9 ,0x7d ,0xfa ,0x59 ,0x47 ,0xf0 ,0xad ,0xd4 ,0xa2 ,0xaf ,0x9c ,0xa4 ,0x72 ,0xc0
@@ -75,41 +78,163 @@ byte inv_s_box2[256] = { 0x30 ,0x68 ,0x99 ,0x1b ,0x87 ,0xb9 ,0x21 ,0x78 ,0x50 ,0
 ,0xf2 ,0xb1 ,0x00 ,0x94 ,0x37 ,0x9f ,0xd0 ,0x2e ,0x9c ,0x6e ,0x28 ,0x3f ,0x80 ,0xf0 ,0x3d ,0xd3
 ,0x25 ,0x8a ,0xb5 ,0xe7 ,0x42 ,0xb3 ,0xc7 ,0xea ,0xf7 ,0x4c ,0x11 ,0x33 ,0x03 ,0xa2 ,0xac ,0x60
 };
-void aria_enc(byte* in, byte* out, byte* w) {
-	char state[Nb];
 
-	state = in;
+//
+//void aria_enc(byte* in, byte* out, byte* w) {
+//
+//	char state[Nb];
+//
+//	state = in;
+//
+//	Add_Round_Key(state, w);
+//
+//	for (int i = 0; i < nr; i++) {
+//		SubstLayer(state);
+//		DiffLayer(state);
+//		AddRoundKey(state, w[round * Nb, (round + 1) * (Nb - 1)]);
+//	}
+//	SubstLayer(state);
+//	AddRoundKey(state, w[Nr * Nb, (Nr + 1) * (Nb - 1)]);
+//
+//	out = state;
+//}
 
-	Add_Round_Key(state, w);
-
-	for (int i = 0; i < nr; i++) {
-		SubstLayer(state);
-		DiffLayer(state);
-		AddRoundKey(state, w[round * Nb, (round + 1) * (Nb - 1)]);
-	}
-	SubstLayer(state);
-	AddRoundKey(state, w[Nr * Nb, (Nr + 1) * (Nb - 1)]);
-
-	out = state;
-
+void Add_Round_Key(byte* state, byte* w) {
+	for (int i = 0; i < 16; i++)
+		state[i] ^= w[i];
+}
+void LT(byte* state) {
+	
+	state[0] = s_box1[state[0]];
+	state[1] = s_box2[state[1]];
+	state[2] = inv_s_box1[state[2]];
+	state[3] = inv_s_box2[state[3]];
 }
 
-void Key_expansion(byte* key[Nk], byte* w[Nb * (Nr + 1)]) {
-	byte KL[16] = { 0x00, };
-	byte KR[16] = { 0x00, };
+void inv_LT(byte* state) {
 
-	for (int i = 0; i < 16; i++)
-		KL[i] = key[i];
-	for (int i = 0; i < 16; i++)
-		KR[i] = key[i + 16];
+	state[0] = inv_s_box1[state[0]];
+	state[1] = inv_s_box2[state[1]];
+	state[2] = s_box1[state[2]];
+	state[3] = s_box2[state[3]];
+}
+
+void SubstLayer(byte* state, int eo) {
+	if (eo == 2) {
+		byte t1[4], t2[4], t3[4], t4[4];
+		memcpy(t1, state, 4);
+		memcpy(t2, state + 4, 4);
+		memcpy(t3, state + 8, 4);
+		memcpy(t4, state + 12, 4);
+		LT(t1);
+		LT(t2);
+		LT(t3);
+		LT(t4);
+		memcpy(state, t1, 4);
+		memcpy(state + 4, t2, 4);
+		memcpy(state + 8, t3, 4);
+		memcpy(state + 12, t4, 4);
+	}
+	if (eo == 1) {
+		byte t1[4], t2[4], t3[4], t4[4];
+		memcpy(t1, state, 4);
+		memcpy(t2, state + 4, 4);
+		memcpy(t3, state + 8, 4);
+		memcpy(t4, state + 12, 4);
+		inv_LT(t1);
+		inv_LT(t2);
+		inv_LT(t3);
+		inv_LT(t4);
+		memcpy(state, t1, 4);
+		memcpy(state + 4, t2, 4);
+		memcpy(state + 8, t3, 4);
+		memcpy(state + 12, t4, 4);
+	}
+}
+
+void DiffLayer(byte* state) {
+	byte tmp[16] = { 0x00, };
+	memcpy(tmp, state, 16);
+
+	state[0] = tmp[3] + tmp[4] + tmp[6] + tmp[8] + tmp[9] + tmp[13] + tmp[14];
+	state[1] = tmp[2] + tmp[5] + tmp[7] + tmp[8] + tmp[9] + tmp[12] + tmp[15];
+	state[2] = tmp[1] + tmp[4] + tmp[6] + tmp[10] + tmp[11] + tmp[12] + tmp[15];
+	state[3] = tmp[0] + tmp[5] + tmp[7] + tmp[10] + tmp[11] + tmp[13] + tmp[14];
+	state[4] = tmp[0] + tmp[2] + tmp[5] + tmp[8] + tmp[11] + tmp[14] + tmp[15];
+	state[5] = tmp[1] + tmp[3] + tmp[4] + tmp[9] + tmp[10] + tmp[14] + tmp[15];
+	state[6] = tmp[0] + tmp[2] + tmp[7] + tmp[9] + tmp[10] + tmp[12] + tmp[13];
+	state[7] = tmp[1] + tmp[3] + tmp[6] + tmp[8] + tmp[11] + tmp[12] + tmp[13];
+	state[8] = tmp[0] + tmp[1] + tmp[4] + tmp[7] + tmp[10] + tmp[13] + tmp[15];
+	state[9] = tmp[0] + tmp[1] + tmp[5] + tmp[6] + tmp[11] + tmp[12] + tmp[14];
+	state[10] = tmp[2] + tmp[3] + tmp[5] + tmp[6] + tmp[8] + tmp[9] + tmp[13];
+	state[11] = tmp[2] + tmp[3] + tmp[4] + tmp[7] + tmp[9] + tmp[12] + tmp[14];
+	state[12] = tmp[1] + tmp[2] + tmp[6] + tmp[7] + tmp[9] + tmp[11] + tmp[12];
+	state[13] = tmp[0] + tmp[3] + tmp[6] + tmp[7] + tmp[8] + tmp[10] + tmp[13];
+	state[14] = tmp[0] + tmp[3] + tmp[4] + tmp[5] + tmp[9] + tmp[11] + tmp[14];
+	state[15] = tmp[1] + tmp[2] + tmp[4] + tmp[5] + tmp[8] + tmp[10] + tmp[15];
+}
+
+void F_o(byte* state, byte* k) {
+	Add_Round_Key(state, k);
+	SubstLayer(state, 2);
+	DiffLayer(state);
+}
+
+void F_e(byte* state, byte* k) {
+	Add_Round_Key(state, k);
+	SubstLayer(state, 1);
+	DiffLayer(state);
+}
+
+void Key_expansion(byte* w, byte* key) {
+	unsigned char W0[16] = { 0x00 };
+	unsigned char W1[16] = { 0x00 };
+	unsigned char W2[16] = { 0x00 };
+	unsigned char W3[16] = { 0x00 };
+	unsigned char tmp[16] = { 0x00 };
+	if (Nk == 16) {
+		byte KL[16] = { 0x00 ,0x01 ,0x02 ,0x03 ,0x04 ,0x05 ,0x06 ,0x07 ,0x08 ,0x09 ,0x0a ,0x0b ,0x0c ,0x0d ,0x0e, 0x0f };
+		byte KR[16] = { 0x00, };
+		byte ck1[16] = { 0x51, 0x7c, 0xc1, 0xb7, 0x27, 0x22, 0x0a, 0x94, 0xfe, 0x13, 0xab, 0xe8, 0xfa, 0x9a, 0x6e, 0xe0 };
+		byte ck2[16] = { 0x6d, 0xb1, 0x4a, 0xcc, 0x9e, 0x21, 0xc8, 0x20, 0xff, 0x28, 0xb1, 0xd5, 0xef, 0x5d, 0xe2, 0xb0 };
+		byte ck3[16] = { 0xdb, 0x92, 0x37, 0x1d, 0x21, 0x26, 0xe9, 0x70, 0x03, 0x24, 0x97, 0x75, 0x04, 0xe8, 0xc9, 0x0e };
+
+		memcpy(W0, KL, 16);
+
+
+
+		memcpy(tmp, W0, 16);
+		F_o(tmp, ck1);
+		for (int i = 0; i < 16; i++)
+			W1[i] = tmp[i];
+		memcpy(tmp, W1, 16);
+		F_o(tmp, ck2);
+		for (int i = 0; i < 16; i++)
+			W2[i] = tmp[i];
+		memcpy(tmp, W2, 16);
+		F_o(tmp, ck3);
+		for (int i = 0; i < 16; i++)
+			W3[i] = tmp[i];
+
+		w[0] = 
+	}
+	else if (Nk == 24) {
+		byte KL[16] = { 0x00 ,0x01 ,0x02 ,0x03 ,0x04 ,0x05 ,0x06 ,0x07 ,0x08 ,0x09 ,0x0a ,0x0b ,0x0c ,0x0d ,0x0e, 0x0f };
+		byte KR[16] = { 0x10 ,0x11 ,0x12 ,0x13 ,0x14 ,0x15 ,0x16 ,0x17 ,0x00 ,0x00 ,0x00 ,0x00 ,0x00 ,0x00 ,0x00, 0x00 };
+		byte ck1[16] = { 0x6d, 0xb1, 0x4a, 0xcc, 0x9e, 0x21, 0xc8, 0x20, 0xff, 0x28, 0xb1, 0xd5, 0xef, 0x5d, 0xe2, 0xb0 };
+		byte ck2[16] = { 0xdb, 0x92, 0x37, 0x1d, 0x21, 0x26, 0xe9, 0x70, 0x03, 0x24, 0x97, 0x75, 0x04, 0xe8, 0xc9, 0x0e };
+		byte ck3[16] = { 0x51, 0x7c, 0xc1, 0xb7, 0x27, 0x22, 0x0a, 0x94, 0xfe, 0x13, 0xab, 0xe8, 0xfa, 0x9a, 0x6e, 0xe0 };
+	}
+	else {
+		byte KL[16] = { 0x00 ,0x01 ,0x02 ,0x03 ,0x04 ,0x05 ,0x06 ,0x07 ,0x08 ,0x09 ,0x0a ,0x0b ,0x0c ,0x0d ,0x0e, 0x0f };
+		byte KR[16] = { 0x10 ,0x11 ,0x12 ,0x13 ,0x14 ,0x15 ,0x16 ,0x17 ,0x18 ,0x19 ,0x1a ,0x1b ,0x1c ,0x1d ,0x1e ,0x1f };
+		byte ck1[16] = { 0xdb, 0x92, 0x37, 0x1d, 0x21, 0x26, 0xe9, 0x70, 0x03, 0x24, 0x97, 0x75, 0x04, 0xe8, 0xc9, 0x0e };
+		byte ck2[16] = { 0x51, 0x7c, 0xc1, 0xb7, 0x27, 0x22, 0x0a, 0x94, 0xfe, 0x13, 0xab, 0xe8, 0xfa, 0x9a, 0x6e, 0xe0 };
+		byte ck3[16] = { 0x6d, 0xb1, 0x4a, 0xcc, 0x9e, 0x21, 0xc8, 0x20, 0xff, 0x28, 0xb1, 0xd5, 0xef, 0x5d, 0xe2, 0xb0 };
+	}
 	
-	W[0]= KL;
-	W[1] = F_o(W[0], CK1) ^ KR;
-	W[2] = F_e(W[1], CK2) ^ W[0];
-	W[3] = F_o(W[2], CK3) ^ W[1];
-	
-	for (int i= 1; i < Nr + 1; i++)
-		w[i] = ROT(W[]) ^ ROT(W[]);
+}
 
-
+void Round_Key_Gen(byte* Rk, byte* W) {
+	Rk[0] = W
 }
