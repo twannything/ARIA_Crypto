@@ -79,25 +79,6 @@ byte inv_s_box2[256] = { 0x30 ,0x68 ,0x99 ,0x1b ,0x87 ,0xb9 ,0x21 ,0x78 ,0x50 ,0
 ,0x25 ,0x8a ,0xb5 ,0xe7 ,0x42 ,0xb3 ,0xc7 ,0xea ,0xf7 ,0x4c ,0x11 ,0x33 ,0x03 ,0xa2 ,0xac ,0x60
 };
 
-//
-//void aria_enc(byte* in, byte* out, byte* w) {
-//
-//	char state[Nb];
-//
-//	state = in;
-//
-//	Add_Round_Key(state, w);
-//
-//	for (int i = 0; i < nr; i++) {
-//		SubstLayer(state);
-//		DiffLayer(state);
-//		AddRoundKey(state, w[round * Nb, (round + 1) * (Nb - 1)]);
-//	}
-//	SubstLayer(state);
-//	AddRoundKey(state, w[Nr * Nb, (Nr + 1) * (Nb - 1)]);
-//
-//	out = state;
-//}
 
 void Add_Round_Key(byte* state, byte* w) {
 	for (int i = 0; i < 16; i++)
@@ -187,11 +168,12 @@ void F_e(byte* state, byte* k) {
 }
 
 void Key_expansion(byte* w, byte* key) {
-	unsigned char W0[16] = { 0x00 };
-	unsigned char W1[16] = { 0x00 };
-	unsigned char W2[16] = { 0x00 };
-	unsigned char W3[16] = { 0x00 };
-	unsigned char tmp[16] = { 0x00 };
+	byte W0[16] = { 0x00 };
+	byte W1[16] = { 0x00 };
+	byte W2[16] = { 0x00 };
+	byte W3[16] = { 0x00 };
+	byte tmp[16] = { 0x00 };
+	
 	if (Nk == 16) {
 		byte KL[16] = { 0x00 ,0x01 ,0x02 ,0x03 ,0x04 ,0x05 ,0x06 ,0x07 ,0x08 ,0x09 ,0x0a ,0x0b ,0x0c ,0x0d ,0x0e, 0x0f };
 		byte KR[16] = { 0x00, };
@@ -200,23 +182,37 @@ void Key_expansion(byte* w, byte* key) {
 		byte ck3[16] = { 0xdb, 0x92, 0x37, 0x1d, 0x21, 0x26, 0xe9, 0x70, 0x03, 0x24, 0x97, 0x75, 0x04, 0xe8, 0xc9, 0x0e };
 
 		memcpy(W0, KL, 16);
-
-
-
 		memcpy(tmp, W0, 16);
 		F_o(tmp, ck1);
 		for (int i = 0; i < 16; i++)
-			W1[i] = tmp[i];
+			W1[i] = tmp[i]^KR[i];
 		memcpy(tmp, W1, 16);
 		F_o(tmp, ck2);
 		for (int i = 0; i < 16; i++)
-			W2[i] = tmp[i];
+			W2[i] = tmp[i]^W0[i];
 		memcpy(tmp, W2, 16);
 		F_o(tmp, ck3);
 		for (int i = 0; i < 16; i++)
-			W3[i] = tmp[i];
-
-		w[0] = 
+			W3[i] = tmp[i]^W1[i];
+		for (int i = 0; i < 16; i++) {
+			w[i] = W0[i] ^ ROR(W1[i], 19);
+			w[i + 16] = W1[i] ^ ROR(W2[i], 19);
+			w[i + 32] = W2[i] ^ ROR(W3[i], 19);
+			w[i + 48] = ROR(W0[i], 19) ^ W3[i];
+			w[i + 64] = W0[i] ^ ROR(W1[i], 31);
+			w[i + 80] = W1[i] ^ ROR(W2[i], 31);
+			w[i + 96] = W2[i] ^ ROR(W3[i], 31);
+			w[i + 112] = ROR(W0[i], 31) ^ W3[i];
+			w[i + 128] = W0[i] ^ ROL(W1[i], 61);
+			w[i + 144] = W1[i] ^ ROL(W2[i], 61);
+			w[i + 160] = W2[i] ^ ROL(W3[i], 61);
+			w[i + 176] = ROL(W0[i], 61) ^ W3[i];
+			w[i + 192] = W0[i] ^ ROL(W1[i], 31);
+			w[i + 208] = W1[i] ^ ROL(W2[i], 31);
+			w[i + 224] = W2[i] ^ ROL(W3[i], 31);
+			w[i + 240] = ROL(W0[i], 31) ^ W3[i];
+			w[i + 256] = W0[i] ^ ROL(W1[i], 19);
+		}
 	}
 	else if (Nk == 24) {
 		byte KL[16] = { 0x00 ,0x01 ,0x02 ,0x03 ,0x04 ,0x05 ,0x06 ,0x07 ,0x08 ,0x09 ,0x0a ,0x0b ,0x0c ,0x0d ,0x0e, 0x0f };
@@ -224,6 +220,38 @@ void Key_expansion(byte* w, byte* key) {
 		byte ck1[16] = { 0x6d, 0xb1, 0x4a, 0xcc, 0x9e, 0x21, 0xc8, 0x20, 0xff, 0x28, 0xb1, 0xd5, 0xef, 0x5d, 0xe2, 0xb0 };
 		byte ck2[16] = { 0xdb, 0x92, 0x37, 0x1d, 0x21, 0x26, 0xe9, 0x70, 0x03, 0x24, 0x97, 0x75, 0x04, 0xe8, 0xc9, 0x0e };
 		byte ck3[16] = { 0x51, 0x7c, 0xc1, 0xb7, 0x27, 0x22, 0x0a, 0x94, 0xfe, 0x13, 0xab, 0xe8, 0xfa, 0x9a, 0x6e, 0xe0 };
+		memcpy(W0, KL, 16);
+		memcpy(tmp, W0, 16);
+		F_o(tmp, ck1);
+		for (int i = 0; i < 16; i++)
+			W1[i] = tmp[i] ^ KR[i];
+		memcpy(tmp, W1, 16);
+		F_o(tmp, ck2);
+		for (int i = 0; i < 16; i++)
+			W2[i] = tmp[i] ^ W0[i];
+		memcpy(tmp, W2, 16);
+		F_o(tmp, ck3);
+		for (int i = 0; i < 16; i++)
+			W3[i] = tmp[i] ^ W1[i];
+		for (int i = 0; i < 16; i++) {
+			w[i] = W0[i] ^ ROR(W1[i], 19);
+			w[i + 16] = W1[i] ^ ROR(W2[i], 19);
+			w[i + 32] = W2[i] ^ ROR(W3[i], 19);
+			w[i + 48] = ROR(W0[i], 19) ^ W3[i];
+			w[i + 64] = W0[i] ^ ROR(W1[i], 31);
+			w[i + 80] = W1[i] ^ ROR(W2[i], 31);
+			w[i + 96] = W2[i] ^ ROR(W3[i], 31);
+			w[i + 112] = ROR(W0[i], 31) ^ W3[i];
+			w[i + 128] = W0[i] ^ ROL(W1[i], 61);
+			w[i + 144] = W1[i] ^ ROL(W2[i], 61);
+			w[i + 160] = W2[i] ^ ROL(W3[i], 61);
+			w[i + 176] = ROL(W0[i], 61) ^ W3[i];
+			w[i + 192] = W0[i] ^ ROL(W1[i], 31);
+			w[i + 208] = W1[i] ^ ROL(W2[i], 31);
+			w[i + 224] = W2[i] ^ ROL(W3[i], 31);
+			w[i + 240] = ROL(W0[i], 31) ^ W3[i];
+			w[i + 256] = W0[i] ^ ROL(W1[i], 19);
+		}
 	}
 	else {
 		byte KL[16] = { 0x00 ,0x01 ,0x02 ,0x03 ,0x04 ,0x05 ,0x06 ,0x07 ,0x08 ,0x09 ,0x0a ,0x0b ,0x0c ,0x0d ,0x0e, 0x0f };
@@ -231,10 +259,58 @@ void Key_expansion(byte* w, byte* key) {
 		byte ck1[16] = { 0xdb, 0x92, 0x37, 0x1d, 0x21, 0x26, 0xe9, 0x70, 0x03, 0x24, 0x97, 0x75, 0x04, 0xe8, 0xc9, 0x0e };
 		byte ck2[16] = { 0x51, 0x7c, 0xc1, 0xb7, 0x27, 0x22, 0x0a, 0x94, 0xfe, 0x13, 0xab, 0xe8, 0xfa, 0x9a, 0x6e, 0xe0 };
 		byte ck3[16] = { 0x6d, 0xb1, 0x4a, 0xcc, 0x9e, 0x21, 0xc8, 0x20, 0xff, 0x28, 0xb1, 0xd5, 0xef, 0x5d, 0xe2, 0xb0 };
+		memcpy(W0, KL, 16);
+		memcpy(tmp, W0, 16);
+		F_o(tmp, ck1);
+		for (int i = 0; i < 16; i++)
+			W1[i] = tmp[i] ^ KR[i];
+		memcpy(tmp, W1, 16);
+		F_o(tmp, ck2);
+		for (int i = 0; i < 16; i++)
+			W2[i] = tmp[i] ^ W0[i];
+		memcpy(tmp, W2, 16);
+		F_o(tmp, ck3);
+		for (int i = 0; i < 16; i++)
+			W3[i] = tmp[i] ^ W1[i];
+		for (int i = 0; i < 16; i++) {
+			w[i] = W0[i] ^ ROR(W1[i], 19);
+			w[i + 16] = W1[i] ^ ROR(W2[i], 19);
+			w[i + 32] = W2[i] ^ ROR(W3[i], 19);
+			w[i + 48] = ROR(W0[i], 19) ^ W3[i];
+			w[i + 64] = W0[i] ^ ROR(W1[i], 31);
+			w[i + 80] = W1[i] ^ ROR(W2[i], 31);
+			w[i + 96] = W2[i] ^ ROR(W3[i], 31);
+			w[i + 112] = ROR(W0[i], 31) ^ W3[i];
+			w[i + 128] = W0[i] ^ ROL(W1[i], 61);
+			w[i + 144] = W1[i] ^ ROL(W2[i], 61);
+			w[i + 160] = W2[i] ^ ROL(W3[i], 61);
+			w[i + 176] = ROL(W0[i], 61) ^ W3[i];
+			w[i + 192] = W0[i] ^ ROL(W1[i], 31);
+			w[i + 208] = W1[i] ^ ROL(W2[i], 31);
+			w[i + 224] = W2[i] ^ ROL(W3[i], 31);
+			w[i + 240] = ROL(W0[i], 31) ^ W3[i];
+			w[i + 256] = W0[i] ^ ROL(W1[i], 19);
+		}
 	}
 	
 }
 
-void Round_Key_Gen(byte* Rk, byte* W) {
-	Rk[0] = W
+
+void aria_enc(byte* state, byte* out, byte* w) {
+
+	Add_Round_Key(state, w);
+	Key_expansion(w, key);
+
+	for (int i = 0; i < Nr; i++) {
+		if ((i % 2) == 0) {
+			F_o(state,w+(i*Nb)
+		}
+		else {
+
+		}
+	}
+	SubstLayer(state);
+	AddRoundKey(state, w[Nr * Nb, (Nr + 1) * (Nb - 1)]);
+
+	out = state;
 }
