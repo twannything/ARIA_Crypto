@@ -137,22 +137,22 @@ void DiffLayer(byte* state) {
 	byte tmp[16] = { 0x00, };
 	memcpy(tmp, state, 16);
 
-	state[0] = tmp[3] + tmp[4] + tmp[6] + tmp[8] + tmp[9] + tmp[13] + tmp[14];
-	state[1] = tmp[2] + tmp[5] + tmp[7] + tmp[8] + tmp[9] + tmp[12] + tmp[15];
-	state[2] = tmp[1] + tmp[4] + tmp[6] + tmp[10] + tmp[11] + tmp[12] + tmp[15];
-	state[3] = tmp[0] + tmp[5] + tmp[7] + tmp[10] + tmp[11] + tmp[13] + tmp[14];
-	state[4] = tmp[0] + tmp[2] + tmp[5] + tmp[8] + tmp[11] + tmp[14] + tmp[15];
-	state[5] = tmp[1] + tmp[3] + tmp[4] + tmp[9] + tmp[10] + tmp[14] + tmp[15];
-	state[6] = tmp[0] + tmp[2] + tmp[7] + tmp[9] + tmp[10] + tmp[12] + tmp[13];
-	state[7] = tmp[1] + tmp[3] + tmp[6] + tmp[8] + tmp[11] + tmp[12] + tmp[13];
-	state[8] = tmp[0] + tmp[1] + tmp[4] + tmp[7] + tmp[10] + tmp[13] + tmp[15];
-	state[9] = tmp[0] + tmp[1] + tmp[5] + tmp[6] + tmp[11] + tmp[12] + tmp[14];
-	state[10] = tmp[2] + tmp[3] + tmp[5] + tmp[6] + tmp[8] + tmp[9] + tmp[13];
-	state[11] = tmp[2] + tmp[3] + tmp[4] + tmp[7] + tmp[9] + tmp[12] + tmp[14];
-	state[12] = tmp[1] + tmp[2] + tmp[6] + tmp[7] + tmp[9] + tmp[11] + tmp[12];
-	state[13] = tmp[0] + tmp[3] + tmp[6] + tmp[7] + tmp[8] + tmp[10] + tmp[13];
-	state[14] = tmp[0] + tmp[3] + tmp[4] + tmp[5] + tmp[9] + tmp[11] + tmp[14];
-	state[15] = tmp[1] + tmp[2] + tmp[4] + tmp[5] + tmp[8] + tmp[10] + tmp[15];
+	state[0] = tmp[3] ^ tmp[4] ^ tmp[6] ^ tmp[8] ^ tmp[9] ^ tmp[13] ^ tmp[14];
+	state[1] = tmp[2] ^ tmp[5] ^ tmp[7] ^ tmp[8] ^ tmp[9] ^ tmp[12] ^ tmp[15];
+	state[2] = tmp[1] ^ tmp[4] ^ tmp[6] ^ tmp[10] ^ tmp[11] ^ tmp[12] ^ tmp[15];
+	state[3] = tmp[0] ^ tmp[5] ^ tmp[7] ^ tmp[10] ^ tmp[11] ^ tmp[13] ^ tmp[14];
+	state[4] = tmp[0] ^ tmp[2] ^ tmp[5] ^ tmp[8] ^ tmp[11] ^ tmp[14] ^ tmp[15];
+	state[5] = tmp[1] ^ tmp[3] ^ tmp[4] ^ tmp[9] ^ tmp[10] ^ tmp[14] ^ tmp[15];
+	state[6] = tmp[0] ^ tmp[2] ^ tmp[7] ^ tmp[9] ^ tmp[10] ^ tmp[12] ^ tmp[13];
+	state[7] = tmp[1] ^ tmp[3] ^ tmp[6] ^ tmp[8] ^ tmp[11] ^ tmp[12] ^ tmp[13];
+	state[8] = tmp[0] ^ tmp[1] ^ tmp[4] ^ tmp[7] ^ tmp[10] ^ tmp[13] ^ tmp[15];
+	state[9] = tmp[0] ^ tmp[1] ^ tmp[5] ^ tmp[6] ^ tmp[11] ^ tmp[12] ^ tmp[14];
+	state[10] = tmp[2] ^ tmp[3] ^ tmp[5] ^ tmp[6] ^ tmp[8] ^ tmp[9] ^ tmp[13];
+	state[11] = tmp[2] ^ tmp[3] ^ tmp[4] ^ tmp[7] ^ tmp[9] ^ tmp[12] ^ tmp[14];
+	state[12] = tmp[1] ^ tmp[2] ^ tmp[6] ^ tmp[7] ^ tmp[9] ^ tmp[11] ^ tmp[12];
+	state[13] = tmp[0] ^ tmp[3] ^ tmp[6] ^ tmp[7] ^ tmp[8] ^ tmp[10] ^ tmp[13];
+	state[14] = tmp[0] ^ tmp[3] ^ tmp[4] ^ tmp[5] ^ tmp[9] ^ tmp[11] ^ tmp[14];
+	state[15] = tmp[1] ^ tmp[2] ^ tmp[4] ^ tmp[5] ^ tmp[8] ^ tmp[10] ^ tmp[15];
 }
 
 void F_o(byte* state, byte* k) {
@@ -313,4 +313,77 @@ void aria_enc(byte* state, byte* out, byte* w) {
 	AddRoundKey(state, w[Nr * Nb, (Nr + 1) * (Nb - 1)]);
 
 	out = state;
+}
+
+void left_shift(byte* x, int l) {
+	int k = 0;
+	int r = 0;
+	int i = 0;
+
+	k = l / 8;
+	r = l % 8;
+
+	if (r == 0) {
+
+		for (i = 0; i+k < 16; i++)
+			x[i] = x[i + k];
+		for (int j = i; j<16; j++)
+			x[j] = 0x00;
+	}
+	else {
+		for (i = 0; i + k < 16; i++)
+			x[i] = (x[i+k] << r) ^ (x[i + 1+k] >> (8 - r));
+		for (int j = i; j < 16; j++)
+			x[j] = 0x00;
+	}
+}
+
+void right_shift(byte* x, int l) {
+	int k = 0;
+	int r = 0;
+	int i = 0;
+
+	k = l / 8;
+	r = l % 8;
+	byte tmp[16] = { 0x00 };
+	memcpy(tmp, x, 16);
+
+	if (r == 0) {
+		for (i = 0; i + k < 16; i++)
+			x[i + k] = tmp[i];
+		for (int j = 0; j < k; j++)
+			x[j] = 0x00;
+	}
+	else {
+		for (i = 0; i + k < 16; i++)
+			x[i+k] = (tmp[i] << r) ^ (x[i + 1] >> (8 - r));
+		for (int j = i; j < k; j++)
+			x[j] = 0x00;
+	}
+}
+
+
+
+void ROR(byte* x, int r) {
+	byte tmp[16];
+	int k = 0;
+	k = 128 - r;
+	memcpy(tmp, x, 16);
+
+	right_shift(x, r);
+	left_shift(tmp, k);
+	for (int i = 0; i < 16; i++)
+		x[i] ^= tmp[i];
+}
+
+void ROL(byte* x, int r) {
+	byte tmp[16];
+	int k = 0;
+	k = 128 - r;
+	memcpy(tmp, x, 16);
+
+	right_shift(tmp, k);
+	left_shift(x, r);
+	for (int i = 0; i < 16; i++)
+		x[i] ^= tmp[i];
 }
