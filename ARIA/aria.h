@@ -27,5 +27,5 @@ typedef unsigned char byte;
 void left_shift(byte* x, int l);
 void right_shift(byte* x, int l);
 void ROR(byte* x, int r);
-
+void Key_expansion(byte* w, byte* key);
 

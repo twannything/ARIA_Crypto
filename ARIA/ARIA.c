@@ -79,6 +79,78 @@ byte inv_s_box2[256] = { 0x30 ,0x68 ,0x99 ,0x1b ,0x87 ,0xb9 ,0x21 ,0x78 ,0x50 ,0
 ,0x25 ,0x8a ,0xb5 ,0xe7 ,0x42 ,0xb3 ,0xc7 ,0xea ,0xf7 ,0x4c ,0x11 ,0x33 ,0x03 ,0xa2 ,0xac ,0x60
 };
 
+void left_shift(byte* x, int l) {
+	int k = 0;
+	int r = 0;
+	int i = 0;
+
+	k = l / 8;
+	r = l % 8;
+
+	if (r == 0) {
+
+		for (i = 0; i + k < 16; i++)
+			x[i] = x[i + k];
+		for (int j = i; j < 16; j++)
+			x[j] = 0x00;
+	}
+	else {
+		for (i = 0; i + k < 16; i++)
+			x[i] = (x[i + k] << r) ^ (x[i + 1 + k] >> (8 - r));
+		for (int j = i; j < 16; j++)
+			x[j] = 0x00;
+	}
+}
+
+void right_shift(byte* x, int l) {
+	int k = 0;
+	int r = 0;
+	int i = 0;
+
+	k = l / 8;
+	r = l % 8;
+	byte tmp[16] = { 0x00 };
+	memcpy(tmp, x, 16);
+
+	if (r == 0) {
+		for (i = 0; i + k < 16; i++)
+			x[i + k] = tmp[i];
+		for (int j = 0; j < k; j++)
+			x[j] = 0x00;
+	}
+	else {
+		for (i = 0; i + k < 16; i++)
+			x[i + k] = (tmp[i] << r) ^ (x[i + 1] >> (8 - r));
+		for (int j = 0; j < k; j++)
+			x[j] = 0x00;
+	}
+}
+
+
+
+void ROR(byte* x, int r) {
+	byte tmp[16];
+	int k = 0;
+	k = 128 - r;
+	memcpy(tmp, x, 16);
+
+	right_shift(x, r);
+	left_shift(tmp, k);
+	for (int i = 0; i < 16; i++)
+		x[i] ^= tmp[i];
+}
+
+void ROL(byte* x, int r) {
+	byte tmp[16];
+	int k = 0;
+	k = 128 - r;
+	memcpy(tmp, x, 16);
+
+	right_shift(tmp, k);
+	left_shift(x, r);
+	for (int i = 0; i < 16; i++)
+		x[i] ^= tmp[i];
+}
 
 void Add_Round_Key(byte* state, byte* w) {
 	for (int i = 0; i < 16; i++)
@@ -147,7 +219,7 @@ void DiffLayer(byte* state) {
 	state[7] = tmp[1] ^ tmp[3] ^ tmp[6] ^ tmp[8] ^ tmp[11] ^ tmp[12] ^ tmp[13];
 	state[8] = tmp[0] ^ tmp[1] ^ tmp[4] ^ tmp[7] ^ tmp[10] ^ tmp[13] ^ tmp[15];
 	state[9] = tmp[0] ^ tmp[1] ^ tmp[5] ^ tmp[6] ^ tmp[11] ^ tmp[12] ^ tmp[14];
-	state[10] = tmp[2] ^ tmp[3] ^ tmp[5] ^ tmp[6] ^ tmp[8] ^ tmp[9] ^ tmp[13];
+	state[10] = tmp[2] ^ tmp[3] ^ tmp[5] ^ tmp[6] ^ tmp[8] ^ tmp[13] ^ tmp[15];
 	state[11] = tmp[2] ^ tmp[3] ^ tmp[4] ^ tmp[7] ^ tmp[9] ^ tmp[12] ^ tmp[14];
 	state[12] = tmp[1] ^ tmp[2] ^ tmp[6] ^ tmp[7] ^ tmp[9] ^ tmp[11] ^ tmp[12];
 	state[13] = tmp[0] ^ tmp[3] ^ tmp[6] ^ tmp[7] ^ tmp[8] ^ tmp[10] ^ tmp[13];
@@ -173,7 +245,7 @@ void Key_expansion(byte* w, byte* key) {
 	byte W2[16] = { 0x00 };
 	byte W3[16] = { 0x00 };
 	byte tmp[16] = { 0x00 };
-	
+
 	if (Nk == 16) {
 		byte KL[16] = { 0x00 ,0x01 ,0x02 ,0x03 ,0x04 ,0x05 ,0x06 ,0x07 ,0x08 ,0x09 ,0x0a ,0x0b ,0x0c ,0x0d ,0x0e, 0x0f };
 		byte KR[16] = { 0x00, };
@@ -185,36 +257,103 @@ void Key_expansion(byte* w, byte* key) {
 		memcpy(tmp, W0, 16);
 		F_o(tmp, ck1);
 		for (int i = 0; i < 16; i++)
-			W1[i] = tmp[i]^KR[i];
+			W1[i] = tmp[i] ^ KR[i];
 		memcpy(tmp, W1, 16);
-		F_o(tmp, ck2);
+		F_e(tmp, ck2);
 		for (int i = 0; i < 16; i++)
-			W2[i] = tmp[i]^W0[i];
+			W2[i] = tmp[i] ^ W0[i];
 		memcpy(tmp, W2, 16);
 		F_o(tmp, ck3);
 		for (int i = 0; i < 16; i++)
-			W3[i] = tmp[i]^W1[i];
-		for (int i = 0; i < 16; i++) {
-			w[i] = W0[i] ^ ROR(W1[i], 19);
-			w[i + 16] = W1[i] ^ ROR(W2[i], 19);
-			w[i + 32] = W2[i] ^ ROR(W3[i], 19);
-			w[i + 48] = ROR(W0[i], 19) ^ W3[i];
-			w[i + 64] = W0[i] ^ ROR(W1[i], 31);
-			w[i + 80] = W1[i] ^ ROR(W2[i], 31);
-			w[i + 96] = W2[i] ^ ROR(W3[i], 31);
-			w[i + 112] = ROR(W0[i], 31) ^ W3[i];
-			w[i + 128] = W0[i] ^ ROL(W1[i], 61);
-			w[i + 144] = W1[i] ^ ROL(W2[i], 61);
-			w[i + 160] = W2[i] ^ ROL(W3[i], 61);
-			w[i + 176] = ROL(W0[i], 61) ^ W3[i];
-			w[i + 192] = W0[i] ^ ROL(W1[i], 31);
-			w[i + 208] = W1[i] ^ ROL(W2[i], 31);
-			w[i + 224] = W2[i] ^ ROL(W3[i], 31);
-			w[i + 240] = ROL(W0[i], 31) ^ W3[i];
-			w[i + 256] = W0[i] ^ ROL(W1[i], 19);
-		}
+			W3[i] = tmp[i] ^ W1[i];
+
+		ROR(W1, 19);
+		for (int i = 0; i < 16; i++)
+			w[i] = W0[i] ^ W1[i];
+		ROL(W1, 19);
+
+		ROR(W2, 19);
+		for (int i = 0; i < 16; i++)
+			w[i + 16] = W1[i] ^ W2[i];
+		ROL(W2, 19);
+
+		ROR(W3, 19);
+		for (int i = 0; i < 16; i++)
+			w[i + 32] = W2[i] ^ W3[i];
+		ROL(W3, 19);
+
+		ROR(W0, 19);
+		for (int i = 0; i < 16; i++)
+			w[i + 48] = W0[i] ^ W3[i];
+		ROL(W0, 19);
+
+		ROR(W1, 31);
+		for (int i = 0; i < 16; i++)
+			w[i + 64] = W0[i] ^ W1[i];
+		ROL(W1, 31);
+
+		ROR(W2, 31);
+		for (int i = 0; i < 16; i++)
+			w[i + 80] = W1[i] ^ W2[i];
+		ROL(W2, 31);
+
+		ROR(W3, 31);
+		for (int i = 0; i < 16; i++)
+			w[i + 96] = W2[i] ^ W3[i];
+		ROL(W3, 31);
+
+		ROR(W0, 31);
+		for (int i = 0; i < 16; i++)
+			w[i + 112] = W0[i] ^ W3[i];
+		ROL(W0, 31);
+
+		ROL(W1, 61);
+		for (int i = 0; i < 16; i++)
+			w[i + 128] = W0[i] ^ W1[i];
+		ROR(W1, 61);
+
+		ROL(W2, 61);
+		for (int i = 0; i < 16; i++)
+			w[i + 144] = W1[i] ^ W2[i];
+		ROR(W2, 61);
+
+		ROL(W3, 61);
+		for (int i = 0; i < 16; i++)
+			w[i + 160] = W2[i] ^ W3[i];
+		ROR(W3, 61);
+
+		ROL(W0, 61);
+		for (int i = 0; i < 16; i++)
+			w[i + 176] = W0[i] ^ W3[i];
+		ROL(W0, 61);
+
+		ROL(W1, 31);
+		for (int i = 0; i < 16; i++)
+			w[i + 192] = W0[i] ^ W1[i];
+		ROR(W1, 31);
+
+		ROL(W2, 31);
+		for (int i = 0; i < 16; i++)
+			w[i + 208] = W1[i] ^ W2[i];
+		ROR(W2, 31);
+
+		ROL(W3, 31);
+		for (int i = 0; i < 16; i++)
+			w[i + 224] = W2[i] ^ W3[i];
+		ROR(W3, 31);
+
+		ROL(W0, 31);
+		for (int i = 0; i < 16; i++)
+			w[i + 240] = W0[i] ^ W3[i];
+		ROR(W0, 31);
+
+		ROL(W1, 19);
+		for (int i = 0; i < 16; i++)
+			w[i + 256] = W0[i] ^ W1[i];
+		ROR(W1, 19);
 	}
-	else if (Nk == 24) {
+}
+	/*else if (Nk == 24) {
 		byte KL[16] = { 0x00 ,0x01 ,0x02 ,0x03 ,0x04 ,0x05 ,0x06 ,0x07 ,0x08 ,0x09 ,0x0a ,0x0b ,0x0c ,0x0d ,0x0e, 0x0f };
 		byte KR[16] = { 0x10 ,0x11 ,0x12 ,0x13 ,0x14 ,0x15 ,0x16 ,0x17 ,0x00 ,0x00 ,0x00 ,0x00 ,0x00 ,0x00 ,0x00, 0x00 };
 		byte ck1[16] = { 0x6d, 0xb1, 0x4a, 0xcc, 0x9e, 0x21, 0xc8, 0x20, 0xff, 0x28, 0xb1, 0xd5, 0xef, 0x5d, 0xe2, 0xb0 };
@@ -291,99 +430,24 @@ void Key_expansion(byte* w, byte* key) {
 			w[i + 240] = ROL(W0[i], 31) ^ W3[i];
 			w[i + 256] = W0[i] ^ ROL(W1[i], 19);
 		}
-	}
 	
-}
+}*/
 
 
-void aria_enc(byte* state, byte* out, byte* w) {
-
-	Add_Round_Key(state, w);
-	Key_expansion(w, key);
-
-	for (int i = 0; i < Nr; i++) {
-		if ((i % 2) == 0) {
-			F_o(state,w+(i*Nb)
-		}
-		else {
-
-		}
-	}
-	SubstLayer(state);
-	AddRoundKey(state, w[Nr * Nb, (Nr + 1) * (Nb - 1)]);
-
-	out = state;
-}
-
-void left_shift(byte* x, int l) {
-	int k = 0;
-	int r = 0;
-	int i = 0;
-
-	k = l / 8;
-	r = l % 8;
-
-	if (r == 0) {
-
-		for (i = 0; i+k < 16; i++)
-			x[i] = x[i + k];
-		for (int j = i; j<16; j++)
-			x[j] = 0x00;
-	}
-	else {
-		for (i = 0; i + k < 16; i++)
-			x[i] = (x[i+k] << r) ^ (x[i + 1+k] >> (8 - r));
-		for (int j = i; j < 16; j++)
-			x[j] = 0x00;
-	}
-}
-
-void right_shift(byte* x, int l) {
-	int k = 0;
-	int r = 0;
-	int i = 0;
-
-	k = l / 8;
-	r = l % 8;
-	byte tmp[16] = { 0x00 };
-	memcpy(tmp, x, 16);
-
-	if (r == 0) {
-		for (i = 0; i + k < 16; i++)
-			x[i + k] = tmp[i];
-		for (int j = 0; j < k; j++)
-			x[j] = 0x00;
-	}
-	else {
-		for (i = 0; i + k < 16; i++)
-			x[i+k] = (tmp[i] << r) ^ (x[i + 1] >> (8 - r));
-		for (int j = i; j < k; j++)
-			x[j] = 0x00;
-	}
-}
-
-
-
-void ROR(byte* x, int r) {
-	byte tmp[16];
-	int k = 0;
-	k = 128 - r;
-	memcpy(tmp, x, 16);
-
-	right_shift(x, r);
-	left_shift(tmp, k);
-	for (int i = 0; i < 16; i++)
-		x[i] ^= tmp[i];
-}
-
-void ROL(byte* x, int r) {
-	byte tmp[16];
-	int k = 0;
-	k = 128 - r;
-	memcpy(tmp, x, 16);
-
-	right_shift(tmp, k);
-	left_shift(x, r);
-	for (int i = 0; i < 16; i++)
-		x[i] ^= tmp[i];
-}
+//void aria_enc(byte* state, byte* out, byte* w) {
+//
+//	Add_Round_Key(state, w);
+//	Key_expansion(w, key);
+//
+//	for (int i = 0; i < Nr; i++) {
+//		if ((i % 2) == 0) 
+//			F_o(state,w+(i*Nb)
+//		else {
+//
+//		}
+//	}
+//	SubstLayer(state);
+//	AddRoundKey(state, w[Nr * Nb, (Nr + 1) * (Nb - 1)]);
+//
+//	out = state;
+//}
