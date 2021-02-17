@@ -95,9 +95,10 @@ void left_shift(byte* x, int l) {
 			x[j] = 0x00;
 	}
 	else {
-		for (i = 0; i + k < 16; i++)
+		for (i = 0; i + k < 15; i++)
 			x[i] = (x[i + k] << r) ^ (x[i + 1 + k] >> (8 - r));
-		for (int j = i; j < 16; j++)
+		x[i] = x[i + k] << r;
+		for (int j = i+1; j < 16; j++)
 			x[j] = 0x00;
 	}
 }
@@ -111,6 +112,7 @@ void right_shift(byte* x, int l) {
 	r = l % 8;
 	byte tmp[16] = { 0x00 };
 	memcpy(tmp, x, 16);
+	byte ttmp = tmp[0];
 
 	if (r == 0) {
 		for (i = 0; i + k < 16; i++)
@@ -119,10 +121,13 @@ void right_shift(byte* x, int l) {
 			x[j] = 0x00;
 	}
 	else {
-		for (i = 0; i + k < 16; i++)
-			x[i + k] = (tmp[i] << r) ^ (x[i + 1] >> (8 - r));
 		for (int j = 0; j < k; j++)
 			x[j] = 0x00;
+		x[k] = ttmp >> r;
+		for (i = 1; i+k< 16; i++)
+			x[i+k] = (tmp[i-1] << (8-r)) ^ (tmp[i] >> r);
+
+
 	}
 }
 
@@ -325,7 +330,7 @@ void Key_expansion(byte* w, byte* key) {
 		ROL(W0, 61);
 		for (int i = 0; i < 16; i++)
 			w[i + 176] = W0[i] ^ W3[i];
-		ROL(W0, 61);
+		ROR(W0, 61);
 
 		ROL(W1, 31);
 		for (int i = 0; i < 16; i++)
@@ -434,20 +439,21 @@ void Key_expansion(byte* w, byte* key) {
 }*/
 
 
-//void aria_enc(byte* state, byte* out, byte* w) {
-//
-//	Add_Round_Key(state, w);
-//	Key_expansion(w, key);
-//
-//	for (int i = 0; i < Nr; i++) {
-//		if ((i % 2) == 0) 
-//			F_o(state,w+(i*Nb)
-//		else {
-//
-//		}
-//	}
-//	SubstLayer(state);
-//	AddRoundKey(state, w[Nr * Nb, (Nr + 1) * (Nb - 1)]);
-//
-//	out = state;
-//}
+void aria_enc(byte* state, byte* out, byte* w) {
+	
+	int i = 0;
+	Key_expansion(w, key);
+
+	for (i = 0; i < Nr-1; i++) {
+		if ((i % 2) == 0)
+			F_o(state, (w + (i * Nb)));
+		else {
+			F_e(state, (w + (i * Nb)));
+		}
+	}
+	Add_Round_Key(state, (w + ((i) * Nb)));
+	SubstLayer(state,1);
+	Add_Round_Key(state, (w + ((i+1)*Nb)));
+
+	memcpy(out, state, 16);
+}
