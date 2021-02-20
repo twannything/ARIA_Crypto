@@ -8,17 +8,17 @@
 #include <string.h>
 
 
-#define Nk 16
+#define Nk 32
 #define Nb 16
 
 #if Nk == 16
 #define Nr 12
 
 #elif Nk == 24
-#define Nr == 14
+#define Nr 14
 
 #else
-#define Nr ==16
+#define Nr 16
 
 #endif
 
@@ -37,4 +37,4 @@ void F_o(byte* state, byte* k);
 void F_e(byte* state, byte* k);
 void Key_expansion(byte* w, byte* key);
 void aria_enc(byte* state, byte* out, byte* w);
-
+void aria_dec(byte* state, byte* out, byte* w);
